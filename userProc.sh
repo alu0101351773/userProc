@@ -12,6 +12,10 @@ TEMP_FILE=$(tempfile --prefix="tmp" --suffix=".userproc.$$")
 # Variables de opciones
 time=1
 count=0
+sort_criteria="-k 1"
+sort_inv=""
+user_manual=0
+real_user=0
 
 # Comprobamos que los usuarios introducidos manualmente existan
 function check_user_list() {
@@ -58,7 +62,7 @@ function set_list() {
 
 
 function sort_list() {
-	echo "caca"
+	echo -e "$(sort $sort_criteria $sort_inv $TEMP_FILE)" > $TEMP_FILE
 }
 
 
@@ -70,7 +74,7 @@ function print_list() {
 
 
 function usage() {
-	echo "usage"
+	echo "usage: userProc [-t time] [-usr] [-u user1 user2 ...] [-count] [-inv] [[-c]|[-pid]]"
 }
 
 function exit_error() {
@@ -78,7 +82,85 @@ function exit_error() {
 	usage
 	exit 1
 }
-set_user_list
-#filter_user_list
+
+
+while [ "$1" != "" ]; do
+	case $1 in
+		-h )
+			usage
+			exit 0
+		;;
+
+		-usr )
+			real_user=1
+		;;
+
+		-count )
+			count=1
+		;;
+
+		-inv )
+			sort_inv="-r"
+		;;
+
+		-t )
+		shift
+			if [[ "$1" =~ ^[0-9]+$ ]]; then
+				time=$1
+			else
+				exit_error "Tiempo incorrecto"
+			fi
+		;;
+
+		-u )
+			user_manual=1
+			while [[ "$2" =~ ^[A-Za-z_]+$ ]]; do
+				list_modified=1
+				shift
+				user_list="$user_list $1"
+			done
+
+			if [ "$list_modified" -ne "1" ]; then
+				exit_error "Error al pasar usuarios"
+			else
+				list_modified=0
+			fi
+
+		;;
+
+		-c )
+			if [ "$sort_criteria" != "-k 1" ]; then
+				exit_error "Exceso de criterios de ordenación"
+			else
+				sort_criteria="-k 4 -n"
+			fi
+		;;
+
+		-pid )
+			if [ "$sort_criteria" != "-k 1" ]; then
+				exit_error "Exceso de criterios de ordenación"
+			else
+				sort_criteria="-k 5 -n"
+			fi
+		;;
+
+		* )
+			exit_error "Argumento desconocido"
+		;;
+	esac
+	shift
+done
+
+if [ "$user_manual" -eq "0" ]; then
+	set_user_list
+fi
+
+check_user_list
+
+if [ "$real_user" -eq "1" ]; then
+	filter_user_list
+fi
+
 set_list
+sort_list
 print_list
