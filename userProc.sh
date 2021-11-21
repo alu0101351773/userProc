@@ -5,7 +5,7 @@ TEXT_ULINE=$(tput sgr 0 1)
 TEXT_GREEN=$(tput setaf 2)
 TEXT_RESET=$(tput sgr0)
 TEMP_FILE=$(tempfile --prefix="tmp" --suffix=".userproc.$$")
-
+time=1
 
 # Si el usuario no ha indicado lista de usuarios
 function set_user_list() {
@@ -30,19 +30,19 @@ function set_list() {
 		user_gid=$( id -g $user)
 		user_uid=$( id -u $user)
 		user_proc_num=$( ps --no-header -u $user | wc -l)
-		user_cpu=$(ps --no-header -u $user -eo pid,time | sort -k 2 -r | head -n 1 | tr -s ' ')
+		user_cpu=$(ps --no-header -eo pid,time,user | grep -w $user |sort -k 2 -r | head -n 1 | tr -s ' ' | awk '{print $1, $2;}')
 		echo "$user $user_gid $user_uid $user_proc_num $user_cpu" >> $TEMP_FILE
 	done
 }
 
 
 function sort_list() {
-	echo "USER GID UID PNUM CPU(id) CPU(t)"
-	awk 'NR == 1 ; NR > 1 {print $0 | "sort -n"}' $TEMP_FILE > $TEMP_FILE
+	echo "caca"
 }
 
 
 function print_list() {
+	echo -e "USER GID UID PNUM GPU(id) GPU(t)\n$(cat $TEMP_FILE)" > $TEMP_FILE
 	column -t -s ' ' $TEMP_FILE
 	echo
 }
