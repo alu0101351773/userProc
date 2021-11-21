@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# AUTOR:	Jorge Cabrera Rodríguez
+# ALU:		alu0101351773
+
 # Constantes de estilo
 TEXT_BOLD=$(tput bold)
 TEXT_ULINE=$(tput sgr 0 1)
@@ -10,73 +13,92 @@ TEXT_RESET=$(tput sgr0)
 TEMP_FILE=$(tempfile --prefix="tmp" --suffix=".userproc.$$")
 
 # Variables de opciones
-time=1
-count=0
-sort_criteria="-k 1"
-sort_inv=""
-user_manual=0
-real_user=0
+TIME=1
+COUNT=0
+SORT_CRITERIA="-k 1"
+SORT_INV=""
+USER_MANUAL=0
+REAL_USER=0
 
-# Comprobamos que los usuarios introducidos manualmente existan
+# Comprobamos que los usuarios de la lista de usuarios existen
 function check_user_list() {
-	for user in $user_list; do
-		id $user 1>/dev/null 2>&1
+	for U_SER in $USER_LIST; do
+		id $U_SER 1>/dev/null 2>&1
+		# Si el comando anterior ha fallado (Salida de error)
 		if [ "$?" -ne "0" ]; then
 			exit_error "Usuario desconocido"
 		fi
 	done
 }
 
-# Si el usuario no ha indicado lista de usuarios
+# Creamos una lista de usuarios con procesos 
+# que cumplan la condición de tiempo
 function set_user_list() {
-	user_list=$( ps --no-header -eo time,user | \
+	USER_LIST=$( ps --no-header -eo time,user | \
 				tr ':' ' ' | \
-				awk '{print $4, $1 * 60 * 60 + $2 * 60 + $3}' | \
-				awk -v time=$time '$2 > time {print $1;}' | \
+				awk '{print $4, $1 * 3600 + $2 * 60 + $3}' | \
+				awk -v time=$TIME '$2 > time {print $1;}' | \
 				sort -u )
 }
 
 
-# Si queremos filtrar 
+# Filtramos usuarios conectados actualmente 
 function filter_user_list() {
-	filter_list=$(who | tr -s ' ' | cut -d ' ' -f 1 | tr '\n' '\|')
-	user_list=$(echo $user_list | tr ' ' '\n' | grep -E -w $filter_list | tr '\n' ' ')
+	FILTER_LIST=$(who | tr -s ' ' | cut -d ' ' -f 1 | tr '\n' '\|')
+	USER_LIST=$(echo $USER_LIST | tr ' ' '\n' | \
+				grep -E -w $FILTER_LIST | tr '\n' ' ')
 }
 
 
 # Establecemos la lista de información
 function set_list() {
-	for user in $user_list; do
-		user_gid=$( id -g $user)
-		user_uid=$( id -u $user)
-		if [ "$count" -eq "1" ];then
-			user_proc_num=$( ps --no-header -u $user | tr ':' ' ' | awk '{print $3 * 60 * 60 + $4 * 60 + $5;}' | awk -v time=$time '$1 > time {print $1;}' | wc -l)
+	for U_SER in $USER_LIST; do
+		USER_GID=$( id -g $U_SER)
+		USER_UID=$( id -u $U_SER)
+		
+		# Número de procesos que cumplen la condición de tiempo 
+		if [ "$COUNT" -eq "1" ];then
+			user_proc_num=$(ps --no-header -u $U_SER | tr ':' ' ' | \
+							awk '{print $3 * 60 * 60 + $4 * 60 + $5;}' | \
+							awk -v time=$TIME '$1 > time {print $1;}' | wc -l)
+		# Número de procesos de un usuario
 		else
-			user_proc_num=$( ps --no-header -u $user | wc -l)
+			user_proc_num=$( ps --no-header -u $U_SER | wc -l)
 		fi
 		
-		user_cpu=$( ps --no-header -eo pid,time,user | grep -w $user | sort -k 2 -r | head -n 1 | tr -s ' ' | awk '{print $1, $2;}')
-		echo "$user $user_gid $user_uid $user_proc_num $user_cpu" >> $TEMP_FILE
+		USER_CPU=$( ps --no-header -eo pid,time,user | grep -w $U_SER | \
+					sort -k 2 -r | head -n 1 | \
+					tr -s ' ' | awk '{print $1, $2;}')
+
+		echo 	"$U_SER $USER_GID $USER_UID" \
+				"$user_proc_num $USER_CPU" >> $TEMP_FILE
 	done
 }
 
 
+# Ordenamos la lista de información según los criterios introducidos
 function sort_list() {
-	echo -e "$(sort $sort_criteria $sort_inv $TEMP_FILE)" > $TEMP_FILE
+	echo -e "$(sort $SORT_CRITERIA $SORT_INV $TEMP_FILE)" > $TEMP_FILE
 }
 
 
+# Imprimimos la lista de información contenida en el fichero temporal
 function print_list() {
-	echo -e "${TEXT_BOLD}USER GID UID PNUM GPU(id) GPU(t)${TEXT_RESET}\n$(cat $TEMP_FILE)" > $TEMP_FILE
+	echo -e "${TEXT_BOLD}USER GID UID PNUM GPU(pid) GPU(t)${TEXT_RESET}" \
+			"\n$(cat $TEMP_FILE)" > $TEMP_FILE
 	column -t -s ' ' $TEMP_FILE
 	echo
 }
 
 
+# Ayuda sobre el script
 function usage() {
-	echo "usage: userProc [-t time] [-usr] [-u user1 user2 ...] [-count] [-inv] [[-c]|[-pid]]"
+	echo 	"usage: userProc [-t time] [-usr] [-u user1 user2 ...]" \
+			"[-count] [-inv] [[-c]|[-pid]]"
 }
 
+
+# Función auxiliar de error
 function exit_error() {
 	echo "${1:-"Error desconocido"}" 1>&2
 	usage
@@ -92,55 +114,58 @@ while [ "$1" != "" ]; do
 		;;
 
 		-usr )
-			real_user=1
+			REAL_USER=1
 		;;
 
 		-count )
-			count=1
+			COUNT=1
 		;;
 
 		-inv )
-			sort_inv="-r"
+			SORT_INV="-r"
 		;;
 
 		-t )
 		shift
+			# Solo si el valor introducido es un número
 			if [[ "$1" =~ ^[0-9]+$ ]]; then
-				time=$1
+				TIME=$1
 			else
-				exit_error "Tiempo incorrecto"
+				exit_error "Valor de tiempo incorrecto."
 			fi
 		;;
 
 		-u )
-			user_manual=1
+			USER_MANUAL=1
+			# Siempre que el SIGUIENTE argumento sea una palabra
 			while [[ "$2" =~ ^[A-Za-z_]+$ ]]; do
-				list_modified=1
+				LIST_MODIFIED=1
 				shift
-				user_list="$user_list $1"
+				USER_LIST="$USER_LIST $1"
 			done
 
-			if [ "$list_modified" -ne "1" ]; then
+			# En caso de no haber pasado ningún usuario
+			if [ "$LIST_MODIFIED" -ne "1" ]; then
 				exit_error "Error al pasar usuarios"
 			else
-				list_modified=0
+				LIST_MODIFIED=0
 			fi
 
 		;;
 
 		-c )
-			if [ "$sort_criteria" != "-k 1" ]; then
+			if [ "$SORT_CRITERIA" != "-k 1" ]; then
 				exit_error "Exceso de criterios de ordenación"
 			else
-				sort_criteria="-k 4 -n"
+				SORT_CRITERIA="-k 4 -n"
 			fi
 		;;
 
 		-pid )
-			if [ "$sort_criteria" != "-k 1" ]; then
+			if [ "$SORT_CRITERIA" != "-k 1" ]; then
 				exit_error "Exceso de criterios de ordenación"
 			else
-				sort_criteria="-k 5 -n"
+				SORT_CRITERIA="-k 5 -n"
 			fi
 		;;
 
@@ -151,13 +176,13 @@ while [ "$1" != "" ]; do
 	shift
 done
 
-if [ "$user_manual" -eq "0" ]; then
+if [ "$USER_MANUAL" -eq "0" ]; then
 	set_user_list
 fi
 
 check_user_list
 
-if [ "$real_user" -eq "1" ]; then
+if [ "$REAL_USER" -eq "1" ]; then
 	filter_user_list
 fi
 
