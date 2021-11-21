@@ -37,7 +37,8 @@ function set_list() {
 
 
 function sort_list() {
-	echo "Soy una avioneta, mira como vuelo FIUUUUMM"
+	echo "USER GID UID PNUM CPU(id) CPU(t)"
+	awk 'NR == 1 ; NR > 1 {print $0 | "sort -n"}' $TEMP_FILE > $TEMP_FILE
 }
 
 
