@@ -145,7 +145,7 @@ while [ "$1" != "" ]; do
 			done
 
 			# En caso de no haber pasado ningún usuario
-			if [ "$LIST_MODIFIED" -ne "1" ]; then
+			if [ "$LIST_MODIFIED" != "1" ]; then
 				exit_error "Error al pasar usuarios"
 			else
 				LIST_MODIFIED=0
@@ -184,6 +184,10 @@ check_user_list
 
 if [ "$REAL_USER" -eq "1" ]; then
 	filter_user_list
+fi
+
+if [ -z "$USER_LIST" ]; then
+	exit_error "No hay usuarios disponibles"
 fi
 
 set_list
